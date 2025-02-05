@@ -2,12 +2,13 @@ import sys
 import streamlit as st
 import torch
 import numpy as np
-import cv2
 import os
+os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '0'
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+import cv2
 import pathlib
 from PIL import Image
 from pathlib import Path
-from glob import glob
 
 # 🔹 Windows 환경에서 'PosixPath' 대신 'WindowsPath'를 사용하도록 설정
 if os.name == 'nt':
@@ -19,7 +20,7 @@ sys.path.append(YOLOV5_PATH)
 
 # YOLOv5에서 필요한 모듈 불러오기
 from models.common import DetectMultiBackend
-from utils.general import non_max_suppression, scale_boxes, xywh2xyxy
+from utils.general import non_max_suppression, scale_boxes
 from utils.torch_utils import select_device
 from utils.augmentations import letterbox  # YOLOv5 리사이징 방식 사용
 
@@ -74,6 +75,7 @@ names = model.names
 
 st.write("Model Class Names:", names)
 
+# 이미지 업로드
 uploaded_files = st.file_uploader("이미지를 업로드하세요", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
 
 # 세션 상태에서 현재 이미지 인덱스 저장 (초기값: 0)
@@ -81,15 +83,18 @@ if "image_index" not in st.session_state:
     st.session_state.image_index = 0
 
 if uploaded_files:
+    # ✅ 한 개의 파일만 선택되었을 경우 리스트로 변환
+    if not isinstance(uploaded_files, list):
+        uploaded_files = [uploaded_files]
+
     total_images = len(uploaded_files)
-    
-    # 🎯 **드래그 바(Slider) 추가** 🎯
-    selected_index = st.slider("이미지 선택", 0, total_images - 1, st.session_state.image_index)
-    
-    # 선택한 이미지로 이동 (슬라이더 값이 변경되었을 때)
-    if selected_index != st.session_state.image_index:
-        st.session_state.image_index = selected_index
-        st.rerun()
+
+    # 🎯 **드래그 바(Slider) 추가 (이미지가 1개 이상일 때만 표시)**
+    if total_images > 1:
+        selected_index = st.slider("이미지 선택", 0, total_images - 1, st.session_state.image_index)
+        if selected_index != st.session_state.image_index:
+            st.session_state.image_index = selected_index
+            st.rerun()
 
     current_index = st.session_state.image_index
     uploaded_file = uploaded_files[current_index]
@@ -136,16 +141,18 @@ if uploaded_files:
     st.image(detected_image, caption=f"Detection Results - {uploaded_file.name}", use_column_width=True)
     st.write(f"객체 감지 완료 - {uploaded_file.name}")
 
-    col1, col2 = st.columns([1, 1])
+    # **"이전" 및 "다음" 버튼 (이미지가 2개 이상일 때만 표시)**
+    if total_images > 1:
+        col1, col2 = st.columns([1, 1])
 
-    with col1:
-        if st.session_state.image_index > 0:
-            if st.button("이전 이미지"):
-                st.session_state.image_index -= 1
-                st.rerun()
+        with col1:
+            if st.session_state.image_index > 0:
+                if st.button("이전 이미지"):
+                    st.session_state.image_index -= 1
+                    st.rerun()
 
-    with col2:
-        if st.session_state.image_index < total_images - 1:
-            if st.button("다음 이미지"):
-                st.session_state.image_index += 1
-                st.rerun()
+        with col2:
+            if st.session_state.image_index < total_images - 1:
+                if st.button("다음 이미지"):
+                    st.session_state.image_index += 1
+                    st.rerun()
