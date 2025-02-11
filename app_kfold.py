@@ -23,7 +23,7 @@ from models.experimental import attempt_load
 from models.common import DetectMultiBackend
 from utils.general import non_max_suppression, scale_boxes
 from utils.torch_utils import select_device
-from utils.augmentations import letterbox  # YOLOv5 리사이징 방식 사용
+from utils.augmentations import letterbox
 
 # ✅ 사용할 YOLOv5 모델 5개 설정 (K-Fold 모델)
 MODEL_PATHS = [
@@ -48,19 +48,29 @@ def load_single_model():
     device = select_device('cpu')
     return DetectMultiBackend(SINGLE_MODEL_PATH, device=device, dnn=False)
 
-# Streamlit UI - 모델 선택
-st.title("YOLOv5 K-Fold 앙상블 & 개별 모델 Object Detection")
-st.write("📌 YOLOv5 5개의 K-Fold 모델과 개별 모델을 비교하여 객체 탐지")
+# ✅ UI 개선: 제목 및 모델 선택 인터페이스 향상
+st.markdown("<h1 style='text-align: center; font-size: 50px;'>O-RING 불량검출</h1>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; font-size: 30px;'>사용할 모델을 선택하세요</h2>", unsafe_allow_html=True)
 
-# 모델 선택 드롭다운 추가
-model_type = st.radio("사용할 모델을 선택하세요:", ["K-Fold 앙상블", "단일 YOLOv5 모델"])
+# 기본적으로 K-Fold 앙상블이 선택되도록 설정
+if "selected_model" not in st.session_state:
+    st.session_state["selected_model"] = "K-Fold 앙상블"
 
-if model_type == "K-Fold 앙상블":
-    models = load_models()
-    st.write("✅ YOLOv5 K-Fold 앙상블 모델 로드 완료!")
-else:
-    models = [load_single_model()]  # 리스트 형태로 유지
-    st.write("✅ 단일 YOLOv5 모델 로드 완료!")
+# 모델 선택 버튼 (가시성 높음)
+col1, col2 = st.columns([1, 1])
+with col1:
+    if st.button("🎯 K-Fold 앙상블", key="kfold", use_container_width=True):
+        st.session_state["selected_model"] = "K-Fold 앙상블"
+with col2:
+    if st.button("🚀 단일 YOLOv5 모델", key="single", use_container_width=True):
+        st.session_state["selected_model"] = "단일 YOLOv5 모델"
+
+# 세션 유지
+model_type = st.session_state["selected_model"]
+st.markdown(f"<h3 style='text-align: center; color: green;'>✅ 선택된 모델: {model_type}</h3>", unsafe_allow_html=True)
+
+# 선택된 모델 로드
+models = load_models() if model_type == "K-Fold 앙상블" else [load_single_model()]
 
 # ✅ YOLOv5 클래스 이름 설정
 CLASS_NAMES = ["extruded", "crack", "cutting", "side_stamped"]
@@ -151,20 +161,42 @@ if uploaded_files:
     _, img_tensor, ratio, pad = prepare_image(processed_image)
     boxes, scores, labels = get_predictions(models, img_tensor)
 
-    # ✅ NMS 적용
-    nms_boxes, nms_scores, nms_labels = ensemble_nms(boxes, scores, labels)
+    # ✅ 결함 여부 체크
+    has_defects = len(boxes) > 0
 
-    # ✅ 바운딩 박스 위치 변환 적용
-    nms_boxes = scale_boxes(img_tensor.shape[2:], torch.tensor(nms_boxes), processed_image.shape).round().numpy()
+    if has_defects:
+        # ✅ NMS 적용 (결함이 있는 경우에만)
+        nms_boxes, nms_scores, nms_labels = ensemble_nms(boxes, scores, labels)
 
-    # ✅ 결과 표시
-    for box, score, label in zip(nms_boxes, nms_scores, nms_labels):
-        x1, y1, x2, y2 = map(int, box)
-        class_name = CLASS_NAMES[int(label)] if int(label) < len(CLASS_NAMES) else f"Class {int(label)}"
-        cv2.rectangle(processed_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(processed_image, f"{class_name}: {score:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        # ✅ 바운딩 박스 위치 변환 적용
+        nms_boxes = scale_boxes(img_tensor.shape[2:], torch.tensor(nms_boxes), processed_image.shape).round().numpy()
 
-    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_column_width=True)
+        # ✅ 바운딩 박스 색상 지정 (클래스별 다른 색상)
+        COLORS = {"extruded": (0, 0, 255), "crack": (255, 0, 0), "cutting": (0, 255, 0), "side_stamped": (255, 255, 0)}
+
+        # ✅ 결과 표시
+        for box, score, label in zip(nms_boxes, nms_scores, nms_labels):
+            x1, y1, x2, y2 = map(int, box)
+            class_name = CLASS_NAMES[int(label)] if int(label) < len(CLASS_NAMES) else f"Class {int(label)}"
+            color = COLORS.get(class_name, (0, 255, 0))  # 기본 초록색
+
+            # 바운딩 박스 그리기
+            cv2.rectangle(processed_image, (x1, y1), (x2, y2), color, 3)
+
+            # 텍스트 배경 박스 추가
+            text = f"{class_name}: {score:.2f}"
+            (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+            cv2.rectangle(processed_image, (x1, y1 - h - 5), (x1 + w + 10, y1), color, -1)
+
+            # 텍스트 추가 (배경 위에 흰색 글씨)
+            cv2.putText(processed_image, text, (x1 + 5, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+        st.markdown("<h3 style='text-align: center; color: red;'>⚠️ 결함이 검출되었습니다.</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='text-align: center; color: green;'>✅ 정상입니다.</h3>", unsafe_allow_html=True)
+
+    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)
+
 
     # **"이전" 및 "다음" 버튼 추가**
     col1, col2 = st.columns([1, 1])
@@ -178,5 +210,3 @@ if uploaded_files:
             if st.button("다음 이미지"):
                 st.session_state.image_index += 1
                 st.rerun()
-
-
