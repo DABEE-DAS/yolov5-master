@@ -174,6 +174,9 @@ if uploaded_files:
         # ✅ 바운딩 박스 색상 지정 (클래스별 다른 색상)
         COLORS = {"extruded": (0, 0, 255), "crack": (255, 0, 0), "cutting": (0, 255, 0), "side_stamped": (255, 255, 0)}
 
+        # ✅ 결함 목록 저장
+        defect_list = []
+
         # ✅ 결과 표시
         for box, score, label in zip(nms_boxes, nms_scores, nms_labels):
             x1, y1, x2, y2 = map(int, box)
@@ -191,12 +194,20 @@ if uploaded_files:
             # 텍스트 추가 (배경 위에 흰색 글씨)
             cv2.putText(processed_image, text, (x1 + 5, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
+            # ✅ 결함 목록에 추가
+            defect_list.append(f"- **{class_name}** (신뢰도: {score:.2f})")
+
+        # ✅ 결함 메시지 표시
         st.markdown("<h3 style='text-align: center; color: red;'>⚠️ 결함이 검출되었습니다.</h3>", unsafe_allow_html=True)
+
+        # ✅ 결함 목록 출력 (아래에 표시)
+        for defect in defect_list:
+            st.markdown(f"<h5 style='text-align: center; color: gray;'>{defect}</h5>", unsafe_allow_html=True)
+
     else:
         st.markdown("<h3 style='text-align: center; color: green;'>✅ 정상입니다.</h3>", unsafe_allow_html=True)
 
     st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)
-
 
     # **"이전" 및 "다음" 버튼 추가**
     col1, col2 = st.columns([1, 1])
