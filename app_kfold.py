@@ -202,22 +202,27 @@ if uploaded_files:
 
         # ✅ 결함 목록 출력 (아래에 표시)
         for defect in defect_list:
-            st.markdown(f"<h5 style='text-align: center; color: gray;'>{defect}</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='text-align: center; color: black;'>{defect}</h5>", unsafe_allow_html=True)
 
     else:
         st.markdown("<h3 style='text-align: center; color: green;'>✅ 정상입니다.</h3>", unsafe_allow_html=True)
 
-    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)
+    # **"이전" 및 "다음" 버튼을 위쪽으로 배치**
+    nav_container = st.container()  # 네비게이션 버튼을 위한 컨테이너 생성
 
-    # **"이전" 및 "다음" 버튼 추가**
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.session_state.image_index > 0:
-            if st.button("이전 이미지"):
-                st.session_state.image_index -= 1
-                st.rerun()
-    with col2:
-        if st.session_state.image_index < total_images - 1:
-            if st.button("다음 이미지"):
-                st.session_state.image_index += 1
-                st.rerun()
+    # 이미지 표시 (버튼보다 아래에 위치)
+    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)  # ✅ 수정됨
+
+    # **네비게이션 버튼 추가**
+    with nav_container:
+        col1, col2 = st.columns([2, 2])  # 왼쪽(이전 버튼 넓게), 오른쪽(다음 버튼 좁게)
+        with col1:
+            if st.session_state.image_index > 0:
+                if st.button("⬅️ 이전 이미지", use_container_width=True):
+                    st.session_state.image_index -= 1
+                    st.rerun()
+        with col2:
+            if st.session_state.image_index < total_images - 1:
+                if st.button("다음 이미지 ➡️", use_container_width=True):
+                    st.session_state.image_index += 1
+                    st.rerun()
