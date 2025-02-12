@@ -9,6 +9,8 @@ from PIL import Image
 from pathlib import Path
 import torchvision.ops as ops
 import matplotlib.pyplot as plt
+import json
+import io
 
 # Windows 환경에서 'PosixPath' 대신 'WindowsPath'를 사용하도록 설정
 if os.name == 'nt':
@@ -140,6 +142,9 @@ uploaded_files = st.file_uploader("📂 이미지를 업로드하세요", type=[
 if "image_index" not in st.session_state:
     st.session_state.image_index = 0
 
+# ✅ has_defects 변수를 미리 초기화
+has_defects = False  # 이미지가 없을 경우 기본값 설정
+
 if uploaded_files:
     total_images = len(uploaded_files)
 
@@ -206,6 +211,68 @@ if uploaded_files:
 
     else:
         st.markdown("<h3 style='text-align: center; color: green;'>✅ 정상입니다.</h3>", unsafe_allow_html=True)
+        
+# ✅ JSON 데이터 생성 함수
+def create_json_data(uploaded_file, boxes, scores, labels):
+    json_data = {
+        "image_name": uploaded_file.name,
+        "detections": []
+    }
+    
+    for box, score, label in zip(boxes, scores, labels):
+        x1, y1, x2, y2 = map(int, box)
+        class_name = CLASS_NAMES[int(label)] if int(label) < len(CLASS_NAMES) else f"Class {int(label)}"
+
+        json_data["detections"].append({
+            "class": class_name,
+            "confidence": round(float(score), 4),
+            "bbox": [x1, y1, x2, y2]
+        })
+    
+    return json_data
+
+# ✅ 결과가 있는 경우 JSON 및 이미지 저장
+if has_defects:
+    # ✅ JSON 데이터 생성
+    json_data = create_json_data(uploaded_file, nms_boxes, nms_scores, nms_labels)
+
+    # ✅ JSON 로컬 저장
+    json_output_path = f"./output/{Path(uploaded_file.name).stem}.json"
+    os.makedirs("./output", exist_ok=True)  # output 폴더 없으면 생성
+    with open(json_output_path, "w") as json_file:
+        json.dump(json_data, json_file, indent=4)
+
+    st.success(f"✅ JSON 저장 완료: {json_output_path}")
+
+    # ✅ JSON 다운로드 버튼 추가
+    json_bytes = io.BytesIO()
+    json_bytes.write(json.dumps(json_data, indent=4).encode())
+    json_bytes.seek(0)
+
+    st.download_button(
+        label="📥 JSON 다운로드",
+        data=json_bytes,
+        file_name=f"{Path(uploaded_file.name).stem}.json",
+        mime="application/json"
+    )
+
+    # ✅ 이미지 저장 (결과 이미지)
+    output_image_path = f"./output/{uploaded_file.name}"
+    cv2.imwrite(output_image_path, processed_image)
+    st.success(f"✅ 이미지 저장 완료: {output_image_path}")
+
+    # ✅ 이미지 다운로드 버튼 추가
+    pil_image = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
+    img_bytes = io.BytesIO()
+    pil_image.save(img_bytes, format="PNG")
+    img_bytes = img_bytes.getvalue()
+
+    st.download_button(
+        label="📥 결과 이미지 다운로드",
+        data=img_bytes,
+        file_name=f"result_{uploaded_file.name}",
+        mime="image/png"
+    )
 
     # **"이전" 및 "다음" 버튼을 위쪽으로 배치**
     nav_container = st.container()  # 네비게이션 버튼을 위한 컨테이너 생성

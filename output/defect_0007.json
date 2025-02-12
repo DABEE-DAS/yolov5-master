@@ -1,0 +1,15 @@
+{
+    "image_name": "defect_0007.png",
+    "detections": [
+        {
+            "class": "crack",
+            "confidence": 0.8063,
+            "bbox": [
+                278,
+                28,
+                377,
+                113
+            ]
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+{
+    "image_name": "defect_0010.png",
+    "detections": [
+        {
+            "class": "extruded",
+            "confidence": 0.8176,
+            "bbox": [
+                95,
+                91,
+                411,
+                419
+            ]
+        },
+        {
+            "class": "crack",
+            "confidence": 0.8021,
+            "bbox": [
+                44,
+                302,
+                201,
+                473
+            ]
+        },
+        {
+            "class": "crack",
+            "confidence": 0.7728,
+            "bbox": [
+                259,
+                417,
+                340,
+                482
+            ]
+        },
+        {
+            "class": "cutting",
+            "confidence": 0.7699,
+            "bbox": [
+                188,
+                417,
+                273,
+                485
+            ]
+        }
+    ]
+}

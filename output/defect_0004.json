@@ -1,0 +1,25 @@
+{
+    "image_name": "defect_0004.png",
+    "detections": [
+        {
+            "class": "side_stamped",
+            "confidence": 0.7934,
+            "bbox": [
+                437,
+                315,
+                472,
+                389
+            ]
+        },
+        {
+            "class": "extruded",
+            "confidence": 0.7131,
+            "bbox": [
+                380,
+                345,
+                402,
+                360
+            ]
+        }
+    ]
+}
