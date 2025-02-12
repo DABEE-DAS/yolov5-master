@@ -1,0 +1,15 @@
+{
+    "image_name": "defect_0009.png",
+    "detections": [
+        {
+            "class": "extruded",
+            "confidence": 0.8653,
+            "bbox": [
+                77,
+                63,
+                453,
+                434
+            ]
+        }
+    ]
+}

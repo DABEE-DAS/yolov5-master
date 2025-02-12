@@ -1,0 +1,15 @@
+{
+    "image_name": "dddd.jpg",
+    "detections": [
+        {
+            "class": "cutting",
+            "confidence": 0.7837,
+            "bbox": [
+                9,
+                195,
+                76,
+                261
+            ]
+        }
+    ]
+}

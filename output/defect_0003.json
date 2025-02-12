@@ -1,0 +1,15 @@
+{
+    "image_name": "defect_0003.png",
+    "detections": [
+        {
+            "class": "side_stamped",
+            "confidence": 0.5753,
+            "bbox": [
+                212,
+                479,
+                233,
+                488
+            ]
+        }
+    ]
+}

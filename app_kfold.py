@@ -51,27 +51,28 @@ def load_single_model():
     return DetectMultiBackend(SINGLE_MODEL_PATH, device=device, dnn=False)
 
 # ✅ UI 개선: 제목 및 모델 선택 인터페이스 향상
-st.markdown("<h1 style='text-align: center; font-size: 50px;'>O-RING 불량검출</h1>", unsafe_allow_html=True)
-st.markdown("<h2 style='text-align: center; font-size: 30px;'>사용할 모델을 선택하세요</h2>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; font-size: 50px;'>🔍O-ring 불량확인</h1>", unsafe_allow_html=True)
+
+# ✅ 사이드바 추가
+st.sidebar.markdown("## 🔍 모델 선택")
 
 # 기본적으로 K-Fold 앙상블이 선택되도록 설정
 if "selected_model" not in st.session_state:
     st.session_state["selected_model"] = "K-Fold 앙상블"
 
-# 모델 선택 버튼 (가시성 높음)
-col1, col2 = st.columns([1, 1])
-with col1:
-    if st.button("🎯 K-Fold 앙상블", key="kfold", use_container_width=True):
-        st.session_state["selected_model"] = "K-Fold 앙상블"
-with col2:
-    if st.button("🚀 단일 YOLOv5 모델", key="single", use_container_width=True):
-        st.session_state["selected_model"] = "단일 YOLOv5 모델"
+# ✅ 모델 선택 버튼 (사이드바로 이동)
+if st.sidebar.button("🎯 K-Fold 앙상블", key="kfold"):
+    st.session_state["selected_model"] = "K-Fold 앙상블"
+if st.sidebar.button("🚀 단일 YOLOv5 모델", key="single"):
+    st.session_state["selected_model"] = "단일 YOLOv5 모델"
 
 # 세션 유지
 model_type = st.session_state["selected_model"]
 st.markdown(f"<h3 style='text-align: center; color: green;'>✅ 선택된 모델: {model_type}</h3>", unsafe_allow_html=True)
 
 # 선택된 모델 로드
+model_type = st.session_state["selected_model"]
+st.sidebar.markdown(f"**✅ 선택된 모델:** `{model_type}`")
 models = load_models() if model_type == "K-Fold 앙상블" else [load_single_model()]
 
 # ✅ YOLOv5 클래스 이름 설정
@@ -135,15 +136,16 @@ def ensemble_nms(boxes, scores, labels, iou_thres=0.5):
     keep_indices = ops.nms(boxes, scores, iou_thres)
     return boxes[keep_indices].cpu().numpy(), scores[keep_indices].cpu().numpy(), labels[keep_indices].cpu().numpy()
 
-# 이미지 업로드
-uploaded_files = st.file_uploader("📂 이미지를 업로드하세요", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+# ✅ 사이드바에 이미지 업로드 추가
+st.sidebar.markdown("## 📂 이미지 업로드")
+uploaded_files = st.sidebar.file_uploader("이미지를 업로드하세요", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
 
 # 세션 상태에서 현재 이미지 인덱스 저장 (초기값: 0)
 if "image_index" not in st.session_state:
     st.session_state.image_index = 0
 
 # ✅ has_defects 변수를 미리 초기화
-has_defects = False  # 이미지가 없을 경우 기본값 설정
+has_defects = False  # 기본값: 이미지가 없을 경우 결함 없음
 
 if uploaded_files:
     total_images = len(uploaded_files)
@@ -166,7 +168,7 @@ if uploaded_files:
     _, img_tensor, ratio, pad = prepare_image(processed_image)
     boxes, scores, labels = get_predictions(models, img_tensor)
 
-    # ✅ 결함 여부 체크
+    # ✅ 결함 여부 체크 (여기서 has_defects 업데이트)
     has_defects = len(boxes) > 0
 
     if has_defects:
@@ -211,85 +213,52 @@ if uploaded_files:
 
     else:
         st.markdown("<h3 style='text-align: center; color: green;'>✅ 정상입니다.</h3>", unsafe_allow_html=True)
-        
-# ✅ JSON 데이터 생성 함수
-def create_json_data(uploaded_file, boxes, scores, labels):
+
+    # ✅ JSON 및 이미지 저장 버튼 (사이드바로 이동)
+    st.sidebar.markdown("## 📥 결과 저장")
+
     json_data = {
         "image_name": uploaded_file.name,
-        "detections": []
+        "detections": [
+            {
+                "class": CLASS_NAMES[int(label)] if int(label) < len(CLASS_NAMES) else f"Class {int(label)}",
+                "confidence": round(float(score), 4),
+                "bbox": list(map(int, box))
+            }
+            for box, score, label in zip(boxes, scores, labels)
+        ]
     }
-    
-    for box, score, label in zip(boxes, scores, labels):
-        x1, y1, x2, y2 = map(int, box)
-        class_name = CLASS_NAMES[int(label)] if int(label) < len(CLASS_NAMES) else f"Class {int(label)}"
 
-        json_data["detections"].append({
-            "class": class_name,
-            "confidence": round(float(score), 4),
-            "bbox": [x1, y1, x2, y2]
-        })
-    
-    return json_data
-
-# ✅ 결과가 있는 경우 JSON 및 이미지 저장
-if has_defects:
-    # ✅ JSON 데이터 생성
-    json_data = create_json_data(uploaded_file, nms_boxes, nms_scores, nms_labels)
-
-    # ✅ JSON 로컬 저장
-    json_output_path = f"./output/{Path(uploaded_file.name).stem}.json"
-    os.makedirs("./output", exist_ok=True)  # output 폴더 없으면 생성
-    with open(json_output_path, "w") as json_file:
-        json.dump(json_data, json_file, indent=4)
-
-    st.success(f"✅ JSON 저장 완료: {json_output_path}")
-
-    # ✅ JSON 다운로드 버튼 추가
     json_bytes = io.BytesIO()
     json_bytes.write(json.dumps(json_data, indent=4).encode())
     json_bytes.seek(0)
 
-    st.download_button(
-        label="📥 JSON 다운로드",
-        data=json_bytes,
-        file_name=f"{Path(uploaded_file.name).stem}.json",
-        mime="application/json"
-    )
+    st.sidebar.download_button("📥 JSON 다운로드", data=json_bytes, file_name=f"{Path(uploaded_file.name).stem}.json", mime="application/json")
 
-    # ✅ 이미지 저장 (결과 이미지)
-    output_image_path = f"./output/{uploaded_file.name}"
-    cv2.imwrite(output_image_path, processed_image)
-    st.success(f"✅ 이미지 저장 완료: {output_image_path}")
-
-    # ✅ 이미지 다운로드 버튼 추가
     pil_image = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
     img_bytes = io.BytesIO()
     pil_image.save(img_bytes, format="PNG")
     img_bytes = img_bytes.getvalue()
 
-    st.download_button(
-        label="📥 결과 이미지 다운로드",
-        data=img_bytes,
-        file_name=f"result_{uploaded_file.name}",
-        mime="image/png"
-    )
+    st.sidebar.download_button("📥 결과 이미지 다운로드", data=img_bytes, file_name=f"result_{uploaded_file.name}", mime="image/png")
 
-    # **"이전" 및 "다음" 버튼을 위쪽으로 배치**
+    # ✅ "이전" 및 "다음" 버튼을 모든 경우에서 표시
     nav_container = st.container()  # 네비게이션 버튼을 위한 컨테이너 생성
 
-    # 이미지 표시 (버튼보다 아래에 위치)
-    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)  # ✅ 수정됨
-
-    # **네비게이션 버튼 추가**
     with nav_container:
-        col1, col2 = st.columns([2, 2])  # 왼쪽(이전 버튼 넓게), 오른쪽(다음 버튼 좁게)
+        col1, col2 = st.columns([2, 2])
+
         with col1:
             if st.session_state.image_index > 0:
                 if st.button("⬅️ 이전 이미지", use_container_width=True):
                     st.session_state.image_index -= 1
                     st.rerun()
+
         with col2:
             if st.session_state.image_index < total_images - 1:
                 if st.button("다음 이미지 ➡️", use_container_width=True):
                     st.session_state.image_index += 1
                     st.rerun()
+    
+    # ✅ 이미지 출력 (네비게이션 버튼 아래, 결함 유무와 관계없이 표시)
+    st.image(processed_image, caption=f"Detection Results - {uploaded_file.name}", use_container_width=True)
